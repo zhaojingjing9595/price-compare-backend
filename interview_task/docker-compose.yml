@@ -1,0 +1,51 @@
+services:
+
+  ebay-server:
+    container_name: ebay-server
+    build:
+      context: .
+      dockerfile: Dockerfile-store
+    ports:
+      - "8300:9991"
+    environment:
+      - STORE_NAME=ebay
+    networks:
+      - store_exercise_1
+
+  amazon-server:
+    container_name: amazon-server
+    build:
+      context: .
+      dockerfile: Dockerfile-store
+    ports:
+      - "8301:9991"
+    environment:
+      - STORE_NAME=amazon
+    networks:
+      - store_exercise_1
+
+  mysql_db:
+    container_name: mysql_db_1
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: abcdef123
+      MYSQL_DATABASE: app_db # Default database created at startup
+      MYSQL_USER: dev
+      MYSQL_PASSWORD: abcdef123
+    volumes:
+      - mysql_db_storage:/var/lib/mysql
+    ports:
+      - "33063:3306"
+    networks:
+      - store_exercise_1
+
+
+networks:
+  store_exercise_1:
+    driver: bridge
+
+
+volumes:
+  mysql_db_storage:
+    driver: local

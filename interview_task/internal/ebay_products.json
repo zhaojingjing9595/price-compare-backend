@@ -1,0 +1,27 @@
+[
+    {
+        "id": "d5fc196b-3878-4450-b803-81c9c5b0c99a",
+        "name": "Samsung Headphones S-104M",
+        "price": 10.59
+    },
+    {
+        "id": "a3ddfb2d-823e-44f8-92f9-1e1fcb1e4882",
+        "name": "LG Monitor 24MP59G",
+        "price": 200.54
+    },
+    {
+        "id": "4ca52168-b1d7-4cc0-91e4-667dfee857d9",
+        "name": "Logitech Mouse M510",
+        "price": 25.53
+    },
+    {
+        "id": "0f4fec1b-10fd-4789-96b3-8d1188ceb68f",
+        "name": "Apple iPhone Charger",
+        "price": 40.99
+    },
+    {
+        "id": "f39b089d-fc21-4022-9df9-1f540ea573fb",
+        "name": "Sony Playstation Controller",
+        "price": 60.89
+    }
+]
