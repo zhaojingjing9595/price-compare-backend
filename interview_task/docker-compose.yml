@@ -39,7 +39,24 @@ services:
       - "33063:3306"
     networks:
       - store_exercise_1
-
+  backend-server:
+    container_name: price-comparison-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:9991"
+    environment:
+      - DATABASE_URL=mysql+pymysql://dev:abcdef123@mysql_db:3306/app_db
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+      ebay-server:
+        condition: service_started
+      amazon-server:
+        condition: service_started
+    networks:
+      - store_exercise_1
 
 networks:
   store_exercise_1:
