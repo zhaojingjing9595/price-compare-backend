@@ -5,7 +5,7 @@ class StoreUnavailableError(Exception):
     """A store's API could not be reached or returned an error status."""
 
 
-async def fetch_products(base_url: str, name_contains: str):
+async def fetch_products(base_url: str, name_contains: str | None = None):
     """Call a store's GET /products."""
     params = {"name_contains": name_contains} if name_contains else {}
     try:

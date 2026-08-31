@@ -35,6 +35,12 @@ services:
       MYSQL_PASSWORD: abcdef123
     volumes:
       - mysql_db_storage:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "dev", "-pabcdef123"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
     ports:
       - "33063:3306"
     networks:
@@ -48,6 +54,8 @@ services:
       - "8000:9991"
     environment:
       - DATABASE_URL=mysql+pymysql://dev:abcdef123@mysql_db:3306/app_db
+      - AMAZON_URL=http://amazon-server:9991
+      - EBAY_URL=http://ebay-server:9991
     depends_on:
       mysql_db:
         condition: service_healthy

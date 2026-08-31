@@ -1,8 +1,9 @@
 import asyncio
 import logging
+from datetime import datetime
 from decimal import Decimal
 
-from config import get_store_base_url
+from services.config import get_store_base_url
 from db.database import SessionLocal
 from models.models import Product, Store
 from services.store_client import StoreUnavailableError, fetch_products
@@ -40,6 +41,9 @@ async def refresh_store_prices(store_id: int, store_name: str):
                 )
                 continue
             product.price = Decimal(str(new_price))
+            # Set explicitly: onupdate would not fire when the price is unchanged,
+            # leaving last_updated stale even though the price was just confirmed.
+            product.last_updated = datetime.now()
             updated += 1
         db.commit()
 
