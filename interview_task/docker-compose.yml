@@ -54,8 +54,6 @@ services:
       - "8000:9991"
     environment:
       - DATABASE_URL=mysql+pymysql://dev:abcdef123@mysql_db:3306/app_db
-      - AMAZON_URL=http://amazon-server:9991
-      - EBAY_URL=http://ebay-server:9991
     depends_on:
       mysql_db:
         condition: service_healthy

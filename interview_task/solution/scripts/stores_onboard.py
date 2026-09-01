@@ -22,12 +22,12 @@ load_dotenv()
 REQUEST_TIMEOUT_SECONDS = 10
 
 
-def load_stores(config_path: str) -> list[dict]:
+def load_stores(config_path: str):
     with open(config_path) as f:
         return (yaml.safe_load(f) or {}).get("stores", [])
 
 
-def onboard_store(api_url: str, store: dict) -> bool:
+def onboard_store(api_url: str, store: dict):
     """Register one store. Returns True if it was newly onboarded."""
     name = store["name"]
     try:
@@ -53,7 +53,7 @@ def onboard_store(api_url: str, store: dict) -> bool:
     return False
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser(description="Onboard stores from a YAML config.")
     parser.add_argument(
         "--api-url",

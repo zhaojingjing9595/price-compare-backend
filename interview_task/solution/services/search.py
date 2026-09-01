@@ -15,7 +15,6 @@ def search_products(db: Session, name_contains: str) -> list[Product]:
         db.query(Product)
         .options(joinedload(Product.store))
         .filter(Product.name.contains(name_contains, autoescape=True))
-        .filter(Product.price.isnot(None))
         .order_by(Product.price.asc())
         .all()
     )

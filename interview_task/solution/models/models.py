@@ -12,8 +12,6 @@ class Store(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(255), unique=True, index=True, nullable=False)
-    # Full URL of the store's GET products endpoint. Single source of truth:
-    # onboarding, the daily refresh and product registration all read it from here.
     api_endpoint = Column(String(512), nullable=False)
     # Set once the first successful backfill (cold start) has landed.
     onboarded = Column(Boolean, default=False, nullable=False)
@@ -27,9 +25,13 @@ class Product(Base):
     __tablename__ = "product"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(255), index=True, nullable=False)
+    # MySQL has no trigram index; the nearest option
+    # is FULLTEXT WITH PARSER ngram, which needs a server-level ngram_token_size
+    # and MATCH ... AGAINST instead of LIKE. Worth it once a scan gets too slow.
+    name = Column(String(255), nullable=False)
     external_product_id = Column(String(255))
-    price = Column(DECIMAL(10, 2))
+    # Every write path seeds a price from the store's catalog, so it is never null.
+    price = Column(DECIMAL(10, 2), nullable=False)
     last_updated = Column(DateTime, server_default=func.now(), onupdate=func.now())
     store_id = Column(Integer, ForeignKey("store.id"), nullable=False)
 
