@@ -1,0 +1,10 @@
+# Every store that should exist in the system.
+# Run `python scripts/stores_onboard.py` once on first deploy, or again
+# whenever a store is added here. Ports match docker-compose.yml.
+
+stores:
+  - name: ebay
+    api_endpoint: "http://localhost:8300/products"
+
+  - name: amazon
+    api_endpoint: "http://localhost:8301/products"

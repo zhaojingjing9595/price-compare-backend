@@ -1,23 +1,34 @@
-from fastapi import APIRouter, HTTPException
-from schemas.schemas import StoreCreate, StoreResponse, ProductCreate, ProductResponse
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+
 from db.database import db_dependency
 from models.models import Store
-from sqlalchemy.exc import IntegrityError
+from schemas.schemas import StoreCreate, StoreOnboardResponse
+from services.sync import cold_start
 
-router = APIRouter()
+router = APIRouter(prefix="/stores", tags=["stores"])
 
-@router.post("/stores", response_model=StoreResponse)
-def register_store(store: StoreCreate, db: db_dependency):
-    """Register a new store into database
+
+@router.post("", response_model=StoreOnboardResponse, status_code=status.HTTP_202_ACCEPTED)
+def register_store(store: StoreCreate, background_tasks: BackgroundTasks, db: db_dependency):
+    """Register a store and kick off its catalog backfill.
+
+    Registering — not the scheduler — is what fires the first fetch, so a new store
+    is searchable in seconds instead of up to 24h later. The backfill runs in the
+    background and the call returns 202 immediately.
     """
-    db_store = Store(name=store.name)
-    db.add(db_store)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=409, detail=f"Store '{store.name}' is already registered")
+    if db.query(Store).filter_by(name=store.name).first():
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Store '{store.name}' is already registered")
 
-    db.refresh(db_store)
-    return db_store
+    new_store = Store(name=store.name, api_endpoint=str(store.api_endpoint), onboarded=False)
+    db.add(new_store)
+    db.commit()
+    db.refresh(new_store)
 
+    background_tasks.add_task(cold_start, new_store.id)
+
+    return StoreOnboardResponse(
+        store_id=new_store.id,
+        name=new_store.name,
+        status="accepted",
+        message="Store registered, catalog backfill started",
+    )

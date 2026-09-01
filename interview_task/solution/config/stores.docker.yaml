@@ -1,0 +1,9 @@
+# Same stores, addressed by their compose service names — use this file when
+# running the onboarding script from inside the compose network.
+
+stores:
+  - name: ebay
+    api_endpoint: "http://ebay-server:9991/products"
+
+  - name: amazon
+    api_endpoint: "http://amazon-server:9991/products"
