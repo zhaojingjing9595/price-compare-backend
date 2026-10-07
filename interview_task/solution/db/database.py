@@ -1,27 +1,25 @@
 import os
 from dotenv import load_dotenv
 from fastapi import Depends
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker, DeclarativeBase
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.orm import Session, DeclarativeBase
 from typing import Annotated
 load_dotenv()
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 
 
-engine = create_engine(DATABASE_URL)
+engine = create_async_engine(DATABASE_URL)
 
-SessionLocal = sessionmaker(bind=engine, class_=Session, expire_on_commit=False)
+AsyncSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
 class Base(DeclarativeBase):
     pass
 
 
-def get_db():
-    db = SessionLocal()
-    try:
+async def get_db():
+    async with AsyncSessionLocal() as db:
         yield db
-    finally:
-        db.close()
+
         
-db_dependency = Annotated[Session, Depends(get_db)]
+db_dependency = Annotated[AsyncSession, Depends(get_db)]

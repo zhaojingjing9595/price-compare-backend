@@ -10,10 +10,9 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
-
-from sqlalchemy.orm import Session
-
-from db.database import SessionLocal
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from db.database import AsyncSessionLocal
 from models.models import Product, Store
 from services.store_client import (
     StoreDataError,
@@ -42,9 +41,11 @@ def parse_listing(item: dict) -> tuple[str, str | None, Decimal]:
     return name, item.get("external_product_id"), price
 
 
-def upsert_products(db: Session, store: Store, items: list[dict]) -> int:
+async def upsert_products(db: AsyncSession, store: Store, items: list[dict]) -> int:
     """Insert or update a store's listings. Malformed entries are skipped, not fatal."""
-    existing = {p.name: p for p in db.query(Product).filter_by(store_id=store.id)}
+    stmt = select(Product).filter_by(store_id=store.id)
+    result = await db.execute(stmt)
+    existing = {p.name: p for p in result.scalars()}
     count = 0
 
     for item in items:
@@ -71,25 +72,25 @@ def upsert_products(db: Session, store: Store, items: list[dict]) -> int:
             )
         count += 1
 
-    db.commit()
+    await db.commit()
     return count
 
 
-async def sync_store(db: Session, store: Store) -> int:
+async def sync_store(db: AsyncSession, store: Store) -> int:
     """Pull a store's full catalog and write it locally. Returns the number of listings."""
     items = await fetch_products(store.api_endpoint)
-    count = upsert_products(db, store, items)
+    count = await upsert_products(db, store, items)
 
     store.onboarded = True
     store.last_synced_at = _now()
-    db.commit()
+    await db.commit()
     return count
 
 
 async def cold_start(store_id: int) -> None:
     """Onboarding backfill. Runs in the background, so it must never raise."""
-    with SessionLocal() as db:
-        store = db.get(Store, store_id)
+    async with AsyncSessionLocal() as db:
+        store = await db.get(Store, store_id)
         if store is None:
             logger.error("[cold start] store %s no longer exists", store_id)
             return
@@ -106,8 +107,8 @@ async def cold_start(store_id: int) -> None:
 async def _refresh_one(store_id: int, semaphore: asyncio.Semaphore) -> int:
     """Refresh a single store in its own Session — a Session is not concurrency-safe."""
     async with semaphore:
-        with SessionLocal() as db:
-            store = db.get(Store, store_id)
+        async with AsyncSessionLocal() as db:
+            store = await db.get(Store, store_id)
             if store is None:
                 return 0
             try:
@@ -124,8 +125,10 @@ async def _refresh_one(store_id: int, semaphore: asyncio.Semaphore) -> int:
 async def refresh_all_stores() -> int:
     """The daily job. Refreshes every onboarded store concurrently; one bad store
     never aborts the cycle. Returns the total number of listings synced."""
-    with SessionLocal() as db:
-        store_ids = [s.id for s in db.query(Store).filter_by(onboarded=True)]
+    async with AsyncSessionLocal() as db:
+        stmt = select(Store.id).filter_by(onboarded=True)
+        result = await db.execute(stmt)
+        store_ids = result.scalars().all()
 
     if not store_ids:
         logger.info("[refresh] no onboarded stores")

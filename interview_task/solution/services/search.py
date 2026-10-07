@@ -3,18 +3,22 @@
 No outbound HTTP on the read path — prices are kept current by the onboarding
 backfill and the daily refresh, so search stays fast however slow the stores are.
 """
+from collections.abc import Sequence
 
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from models.models import Product
 
 
-def search_products(db: Session, name_contains: str) -> list[Product]:
+async def search_products(db: AsyncSession, name_contains: str) -> Sequence[Product]:
     """Listings whose name contains `name_contains`, cheapest first."""
-    return (
-        db.query(Product)
+    stmt = (
+        select(Product)
         .options(joinedload(Product.store))
         .filter(Product.name.contains(name_contains, autoescape=True))
         .order_by(Product.price.asc())
-        .all()
     )
+    result = await db.execute(stmt)
+    return result.unique().scalars().all()

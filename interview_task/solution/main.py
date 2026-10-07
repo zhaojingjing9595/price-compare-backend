@@ -27,7 +27,8 @@ REFRESH_INTERVAL_HOURS = 24
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
     # Stores publish prices once a day. The first sync of a store happens at
     # onboarding, so this job only keeps already-onboarded stores current.

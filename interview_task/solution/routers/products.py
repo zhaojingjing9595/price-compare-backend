@@ -18,7 +18,7 @@ async def register_product(product: ProductCreate, db: db_dependency):
 
     Store errors surface as 503 via the handlers in main.py.
     """
-    store = db.get(Store, product.store_id)
+    store = await db.get(Store, product.store_id)
     if store is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Store not found")
 
@@ -40,19 +40,20 @@ async def register_product(product: ProductCreate, db: db_dependency):
     )
     db.add(db_product)
     try:
-        db.commit()
+        await db.commit()
     except IntegrityError:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
             status.HTTP_409_CONFLICT, "Product already registered for this store"
         )
-    db.refresh(db_product)
+    await db.refresh(db_product)
     return db_product
 
 
 @router.get("", response_model=list[SearchResultItem])
-def search(search_text: str, db: db_dependency):
+async def search(search_text: str, db: db_dependency):
     """Search locally cached listings by name substring, cheapest first."""
+    products = await search_products(db, search_text)
     return [
         SearchResultItem(
             product_name=p.name,
@@ -60,5 +61,5 @@ def search(search_text: str, db: db_dependency):
             price=p.price,
             last_updated=p.last_updated,
         )
-        for p in search_products(db, search_text)
+        for p in products
     ]

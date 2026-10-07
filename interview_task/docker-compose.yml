@@ -53,7 +53,7 @@ services:
     ports:
       - "8000:9991"
     environment:
-      - DATABASE_URL=mysql+pymysql://dev:abcdef123@mysql_db:3306/app_db
+      - DATABASE_URL=mysql+asyncmy://dev:abcdef123@mysql_db:3306/app_db
     depends_on:
       mysql_db:
         condition: service_healthy
