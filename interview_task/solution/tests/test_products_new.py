@@ -4,7 +4,7 @@ from models.models import Product, Store
 import pytest
 
 def _fake_catalog(*items):
-    async def fetch(_api_endpoint, _name_contains=None):
+    async def fetch(api_endpoint, name_contains=None):
         return list(items)
 
     return fetch
