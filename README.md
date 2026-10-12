@@ -168,7 +168,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt          # at interview_task/, not solution/
 docker compose up ebay-server amazon-server mysql_db   # deps only
 cd solution && uvicorn main:app --reload --port 8000
-python scripts/stores_onboard.py
+python scripts/stores_onboard.py --config config/stores.yaml
 ```
 
 ### Tests

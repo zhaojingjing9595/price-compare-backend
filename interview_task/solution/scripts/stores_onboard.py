@@ -60,7 +60,7 @@ def main():
         default=os.environ.get("API_URL", "http://localhost:8000"),
         help="Base URL of the running API",
     )
-    parser.add_argument("--config", default="config/stores.yaml", help="Path to the stores YAML")
+    parser.add_argument("--config", default="config/stores.docker.yaml", help="Path to the stores YAML")
     args = parser.parse_args()
 
     try:

@@ -26,7 +26,7 @@ logging.basicConfig(level=logging.INFO)
 REFRESH_INTERVAL_HOURS = 24
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
