@@ -56,7 +56,7 @@ async def client(db_session):
 
 
 @pytest.fixture()
-async def store(db_session):
+async def ebay_store(db_session):
     store = Store(
         name="ebay",
         api_endpoint="http://ebay-server:9991/products",
