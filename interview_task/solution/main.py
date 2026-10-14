@@ -14,7 +14,6 @@ from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
-
 from db.database import Base, engine
 from errors import register_error_handlers
 from routers.products import router as product_router
@@ -22,8 +21,6 @@ from routers.stores import router as store_router
 from services.sync import refresh_all_stores
 
 logging.basicConfig(level=logging.INFO)
-
-REFRESH_INTERVAL_HOURS = 24
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -36,7 +33,7 @@ async def lifespan(_app: FastAPI):
     scheduler.add_job(
         refresh_all_stores,
         "interval",
-        hours=REFRESH_INTERVAL_HOURS,
+        minutes=5,
         id="refresh_all_stores",
         max_instances=1,
         coalesce=True,

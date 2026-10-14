@@ -17,6 +17,7 @@ class StoreResponse(BaseModel):
     name: str
     api_endpoint: str
     onboarded: bool
+    last_synced_at: datetime | None
     created_at: datetime
 
 
@@ -50,3 +51,6 @@ class SearchResultItem(BaseModel):
     store_name: str
     price: Decimal
     last_updated: datetime
+
+class RefreshResponse(BaseModel):
+    products_synced: int
