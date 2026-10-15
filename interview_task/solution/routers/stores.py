@@ -3,11 +3,16 @@ from sqlalchemy import select
 
 from db.database import db_dependency
 from models.models import Store
-from schemas.schemas import StoreCreate, StoreOnboardResponse
-from services.sync import cold_start
-
+from schemas.schemas import RefreshResponse, StoreCreate, StoreOnboardResponse, StoreResponse
+from services.sync import cold_start, refresh_all_stores, sync_store
 router = APIRouter(prefix="/stores", tags=["stores"])
 
+
+@router.get("", response_model=list[StoreResponse])
+async def list_stores(db: db_dependency):
+    """All registered stores."""
+    result = await db.execute(select(Store))
+    return result.scalars().all()
 
 @router.post("", response_model=StoreOnboardResponse, status_code=status.HTTP_202_ACCEPTED)
 async def register_store(store: StoreCreate, background_tasks: BackgroundTasks, db: db_dependency):
@@ -34,3 +39,18 @@ async def register_store(store: StoreCreate, background_tasks: BackgroundTasks, 
         status="accepted",
         message="Store registered, catalog backfill started",
     )
+
+
+@router.post("/refresh", response_model=RefreshResponse)
+async def refresh_all():
+    """Force-refresh every onboarded store now instead of waiting for the daily job."""
+    return RefreshResponse(products_synced=await refresh_all_stores())
+
+
+@router.post("/{store_id}/refresh", response_model=RefreshResponse)
+async def refresh_store(store_id: int, db: db_dependency):
+    """Force-refresh one store's prices. Store failures surface as 503 via main.py's handlers."""
+    store = await db.get(Store, store_id)
+    if store is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Store not found")
+    return RefreshResponse(products_synced=await sync_store(db, store))

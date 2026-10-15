@@ -128,24 +128,64 @@ returns `[]`.
 
 ## Running
 
+There are two ways to run the project. Pick one; you don't need both.
+
+| | **A. Docker** (recommended) | **B. Without Docker** (local development) |
+|---|---|---|
+| Use it to | run the whole system and try it out | edit code with hot reload, run tests |
+| You need | Docker + Docker Compose | Docker (for MySQL + the store simulators), Python 3.13, Node 22 |
+| `.env` files | **not needed** | `solution/.env` required; `frontend/.env` optional |
+| `npm install` / `pip install` | **not needed** (done inside the images) | needed |
+| UI at | `http://localhost:3000` | `http://localhost:5173` |
+
+All commands below are run from `interview_task/`, where `docker-compose.yml` lives.
+
+---
+
+### A. Running with Docker
+
+No `.env` files, no `npm install`, no Python virtualenv: every dependency is installed
+inside the images during the build.
+
+**1. Start all five containers**
+
 ```bash
+cd interview_task
 docker compose up --build
 ```
 
-Brings up `ebay-server` (8300), `amazon-server` (8301), `mysql_db` (33063) and the
-API (8000). Tables are created on startup.
+| Container | Host port | Purpose |
+|---|---|---|
+| `ebay-server` | 8300 | simulated store |
+| `amazon-server` | 8301 | simulated store |
+| `mysql_db` | 33063 | MySQL; tables are created on API startup |
+| `backend-server` | 8000 (→ 9991 in the container) | the FastAPI app |
+| `frontend` | 3000 (→ 80 in the container) | the React UI, served by nginx |
 
-Then seed the stores — this triggers the first catalog pull. Run it *inside* the API
-container, so the stored `api_endpoint` is a compose service name and not `localhost`:
+These host ports must be free. The backend gets `DATABASE_URL` directly from
+`docker-compose.yml`.
+
+The frontend's `Dockerfile` is a two-stage build. A `node:22-alpine` stage runs
+`npm ci && npm run build`, then only the resulting static `dist/` is copied into an
+`nginx:alpine` stage. nginx serves the UI and also acts as the reverse proxy for `/api`
+(see `frontend/nginx.conf`).
+
+**2. Seed the stores** (in a second terminal, once the containers are up)
+
+Until stores are registered, every search returns `[]`. This registers `ebay` and
+`amazon` and triggers their first catalog pull:
 
 ```bash
 docker compose exec backend-server python scripts/stores_onboard.py \
-  --api-url http://localhost:9991 --config config/stores.docker.yaml
+  --api-url http://localhost:9991
 ```
 
-Re-runnable: existing stores are skipped. After that the scheduler refreshes every 24h.
+Running the script inside the API container means nothing extra has to be installed
+on your machine. It's re-runnable (existing stores are skipped), and afterwards the
+scheduler refreshes prices every 24h. To run it from your own machine instead, see
+[Seeding the stores](#seeding-the-stores-reference).
 
-### Manual verification
+**3. Verify**
 
 ```bash
 docker compose logs -f backend-server                        # expect "[cold start] ebay: N products backfilled"
@@ -153,26 +193,137 @@ curl 'http://localhost:8000/products?search_text=Samsung'    # cheapest first, o
 curl 'http://localhost:8000/products?search_text=zzz'        # []
 ```
 
-Code is baked into the image, so rebuild after editing: `docker compose up -d --build
-backend-server`. MySQL persists in a volume — `docker compose down -v` for a clean run.
+Or open `http://localhost:3000` and search "Samsung". Interactive API docs are at
+`http://localhost:8000/docs`.
 
-### Environment
+**Rebuilding and resetting**
 
-Copy `solution/.env.example` to `solution/.env`. Store URLs are **not** environment
-variables — they live in `config/stores.yaml` and are persisted per store at onboarding.
+Code is baked into the images, so rebuild after editing:
 
-### Running outside Docker
+```bash
+docker compose up -d --build backend-server   # after backend changes
+docker compose up -d --build frontend         # after UI changes
+docker compose down -v                        # stop everything and wipe the MySQL volume
+```
+
+---
+
+### B. Running without Docker (local development)
+
+The backend and frontend run on your machine with hot reload. MySQL and the two store
+simulators still run in Docker, since they're dependencies rather than code you're
+editing.
+
+**1. Start the dependencies only**
+
+```bash
+cd interview_task
+docker compose up ebay-server amazon-server mysql_db
+```
+
+**2. Backend** (new terminal, from `interview_task/`)
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt          # at interview_task/, not solution/
-docker compose up ebay-server amazon-server mysql_db   # deps only
-cd solution && uvicorn main:app --reload --port 8000
+pip install -r requirements.txt            # requirements.txt is in interview_task/, not solution/
+cd solution
+cp .env.example .env                       # required: provides DATABASE_URL
+uvicorn main:app --reload --port 8000
+```
+
+`solution/.env` is required here: `db/database.py` reads `DATABASE_URL` at import time
+and fails without it. The example value points at the Docker MySQL on host port 33063.
+
+**3. Seed the stores** (from `interview_task/solution/`, venv active)
+
+```bash
 python scripts/stores_onboard.py --config config/stores.yaml
 ```
 
-### Tests
+`config/stores.yaml` uses `localhost` store URLs (ports 8300/8301), which are what a
+backend running on your machine can reach.
+
+**4. Frontend** (new terminal, from `interview_task/`)
 
 ```bash
-cd solution && pytest
+cd frontend
+npm install
+cp .env.example .env    # optional: only if the backend is somewhere other than localhost:8000
+npm run dev
 ```
+
+Opens at `http://localhost:5173`. Vite proxies `/api/*` to `API_PROXY_TARGET` from
+`frontend/.env`, and falls back to `http://localhost:8000` when it isn't set, so with
+the backend from step 2 the `.env` file can be skipped.
+
+> **Mixing the two:** you can also run only the frontend with `npm run dev` against the
+> full Docker stack from option A. The backend is still on `localhost:8000`, so no
+> extra configuration is needed.
+
+**5. Tests** (from `interview_task/solution/`, venv active)
+
+```bash
+pytest
+```
+
+Tests use in-memory SQLite and override `get_db`, so they need neither MySQL nor a
+`.env` file.
+
+---
+
+### Seeding the stores (reference)
+
+`scripts/stores_onboard.py` takes two settings, and each depends on where something runs:
+
+- **`--api-url`** depends on where the *script* runs. It's the address the script uses
+  to reach the API. Default: `$API_URL`, or `http://localhost:8000`.
+- **`--config`** depends on where the *backend* runs. The `api_endpoint` values in it
+  are stored and later fetched by the backend, so they must be reachable from there.
+  A backend in Docker needs `config/stores.docker.yaml` (compose service names, the
+  default). A backend on your machine needs `config/stores.yaml` (`localhost` ports).
+
+| Script runs on | Backend runs in | `--api-url` | `--config` |
+|---|---|---|---|
+| API container | Docker (option A) | `http://localhost:9991` (uvicorn's port inside the container) | `config/stores.docker.yaml` (default) |
+| Your machine | Docker (option A) | `http://localhost:8000` (default) | `config/stores.docker.yaml` (default) |
+| Your machine | Your machine (option B) | `http://localhost:8000` (default) | `config/stores.yaml` |
+
+Running the script from your machine requires the Python setup from option B, step 2
+(`httpx`, `pyyaml` and `python-dotenv` must be installed).
+
+Store URLs are **not** environment variables. They live in `config/stores*.yaml` and
+are persisted per store at onboarding.
+
+---
+
+### How frontend API calls actually reach the backend
+
+The frontend code never calls the backend's real address. Every request goes through
+`src/api/api.ts`, which always calls a relative `/api/...` path:
+
+```ts
+const API_BASE = '/api'
+fetch(`${API_BASE}/products`)   // → /api/products
+fetch(`${API_BASE}/stores`)     // → /api/stores
+```
+
+Whatever is in front of the frontend rewrites `/api/...` to `/...` and forwards it to
+wherever the backend actually is. Which proxy that is, and the backend address it
+forwards to, depends on how the frontend is running:
+
+| Frontend running via | What proxies `/api` | Browser requests | Gets rewritten/forwarded to |
+|---|---|---|---|
+| Option A: `docker compose up` (nginx, port 3000) | `nginx.conf`'s `location /api/ { proxy_pass http://backend-server:9991/; }` | `http://localhost:3000/api/products` | `http://backend-server:9991/products`, reachable because nginx is on the same `store_exercise_1` Docker network as the backend |
+| Option B: `npm run dev` (Vite, port 5173), backend in Docker | Vite's `server.proxy` in `vite.config.ts`, target `API_PROXY_TARGET` (default `http://localhost:8000`) | `http://localhost:5173/api/products` | `http://localhost:8000/products`, the host-published port, which Docker forwards to the container's 9991 |
+| Option B: `npm run dev` (Vite, port 5173), backend via `uvicorn --port 8000` on your machine | Same Vite proxy, same target | `http://localhost:5173/api/products` | `http://localhost:8000/products` directly on your machine |
+
+In every case the `/api` prefix is stripped during the rewrite. nginx does it with the
+trailing slashes (`/api/` → `/`) and Vite with an explicit
+`rewrite: (path) => path.replace(/^\/api/, '')`. The backend's own routes
+(`routers/products.py`, `routers/stores.py`) are mounted at `/products` and `/stores`,
+not `/api/products`.
+
+This indirection lets the same frontend bundle run unmodified in Docker or in dev. Only
+the proxy's *target* changes between environments (`nginx.conf` baked into the image vs.
+Vite's `API_PROXY_TARGET`), never the frontend's own code. It also avoids CORS entirely,
+since the browser only ever talks to one origin: whichever proxy is in front of it.

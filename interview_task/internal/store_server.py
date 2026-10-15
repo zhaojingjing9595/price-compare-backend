@@ -17,7 +17,7 @@ from random import randint
 
 STORE_NAME = os.getenv("STORE_NAME", "unknown")
 PRODUCTS_FILE_PATH = f'{STORE_NAME}_products.json'
-
+PRICE_UPDATE_INTERVAL_MINUTES = int(os.getenv("PRICE_UPDATE_INTERVAL_MINUTES", "5"))
 
 app = FastAPI()
 logger = logging.getLogger("uvicorn")
@@ -37,14 +37,17 @@ async def load_products():
 
 
 async def update_prices_if_needed(products: list):
-    last_price_update_date = os.getenv("LAST_PRICE_UPDATE_DATE", None)
-    if last_price_update_date == datetime.date.today().isoformat():
-        return products
+    last_price_update_ts = os.getenv("LAST_PRICE_UPDATE_TS")
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if last_price_update_ts:
+        last_ts = datetime.datetime.fromisoformat(last_price_update_ts)
+        if now - last_ts < datetime.timedelta(minutes=PRICE_UPDATE_INTERVAL_MINUTES):
+            return products
     for p in products:
         p['price'] = p['price'] + randint(1, 100)
     async with aiofiles.open(PRODUCTS_FILE_PATH, 'w') as file:
         await file.write(json.dumps(products, indent=4))
-    os.environ["LAST_PRICE_UPDATE_DATE"] = datetime.date.today().isoformat()
+    os.environ["LAST_PRICE_UPDATE_TS"] = now.isoformat()
     return products
 
 

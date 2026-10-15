@@ -51,7 +51,7 @@ async def register_product(product: ProductCreate, db: db_dependency):
 
 
 @router.get("", response_model=list[SearchResultItem])
-async def search(search_text: str, db: db_dependency):
+async def search( db: db_dependency, search_text: str | None = None):
     """Search locally cached listings by name substring, cheapest first."""
     products = await search_products(db, search_text)
     return [

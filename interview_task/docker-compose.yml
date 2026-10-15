@@ -9,6 +9,7 @@ services:
       - "8300:9991"
     environment:
       - STORE_NAME=ebay
+      - PRICE_UPDATE_INTERVAL_MINUTES=5
     networks:
       - store_exercise_1
 
@@ -21,6 +22,7 @@ services:
       - "8301:9991"
     environment:
       - STORE_NAME=amazon
+      - PRICE_UPDATE_INTERVAL_MINUTES=5
     networks:
       - store_exercise_1
 
@@ -61,6 +63,16 @@ services:
         condition: service_started
       amazon-server:
         condition: service_started
+    networks:
+      - store_exercise_1
+  frontend:
+    container_name: price-comparison-ui
+    build:
+      context: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend-server
     networks:
       - store_exercise_1
 
